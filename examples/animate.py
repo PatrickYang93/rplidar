@@ -16,6 +16,16 @@ def update_line(num, iterator, line):
     line.set_offsets(offsets)
     intens = np.array([meas[0] for meas in scan])
     line.set_array(intens)
+    
+    for k in len(scan):
+        j = k // 3 * 3
+        q = scan[j][0]
+        x = scan[j][1] * np.pi / 180
+        y = scan[j][2]
+        
+        if(q > 28 and y < 400)
+            plt.annotate(q, xy = (x,y), fontsize = 9)
+    
     return line,
 
 def run():
