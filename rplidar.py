@@ -4,21 +4,20 @@ Usage example:
 
 >>> from rplidar import RPLidar
 >>> lidar = RPLidar('/dev/ttyUSB0')
->>> 
->>> info = lidar.get_info()
->>> print(info)
->>> 
->>> health = lidar.get_health()
->>> print(health)
->>> 
->>> for i, scan in enumerate(lidar.iter_scans()):
-...  print('%d: Got %d measurments' % (i, len(scan)))
-...  if i > 10:
-...   break
-...
+>>> info =lidar.get_info()
+>>> print('\n'.join('%s: %s' % (k, str(v)) for k, v in info.items()))
+firmware: (1, 15)
+model: 0
+hardware: 0
+serialnumber: 64E699F3C7E59AF0A2E69DF8F13735
+>>> lidar.get_health()
+('Good', 0)
+>>> process_scan = lambda scan: None
+>>> for scan in lidar.iter_scans():
+...  process_scan(scan)
+KeyboardInterrupt
 >>> lidar.stop()
 >>> lidar.stop_motor()
->>> lidar.disconnect()
 
 For additional information please refer to the RPLidar class documentation.
 '''
@@ -51,7 +50,7 @@ SCAN_TYPE = 129
 
 #Constants & Command to start A2 motor
 MAX_MOTOR_PWM = 1023
-DEFAULT_MOTOR_PWM = 660
+DEFAULT_MOTOR_PWM = 600
 SET_PWM_BYTE = b'\xF0'
 
 _HEALTH_STATUSES = {
@@ -127,7 +126,7 @@ class RPLidar(object):
             self._serial_port = serial.Serial(
                 self.port, self.baudrate,
                 parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
-                timeout=self.timeout, dsrdtr=True)
+                timeout=self.timeout)
         except serial.SerialException as err:
             raise RPLidarException('Failed to connect to the sensor '
                                    'due to: %s' % err)
@@ -147,7 +146,7 @@ class RPLidar(object):
         '''Starts sensor motor'''
         self.logger.info('Starting motor')
         # For A1
-        self._serial_port.dtr = False
+        self._serial_port.setDTR(False)
 
         # For A2
         self.set_pwm(DEFAULT_MOTOR_PWM)
@@ -160,7 +159,7 @@ class RPLidar(object):
         self.set_pwm(0)
         time.sleep(.001)
         # For A1
-        self._serial_port.dtr = True
+        self._serial_port.setDTR(True)
         self.motor_running = False
 
     def _send_payload_cmd(self, cmd, payload):
@@ -326,14 +325,14 @@ class RPLidar(object):
             if max_buf_meas:
                 data_in_buf = self._serial_port.in_waiting
                 if data_in_buf > max_buf_meas*dsize:
-                    self.logger.warning(
-                        'Too many measurments in the input buffer: %d/%d. '
-                        'Clearing buffer...',
-                        data_in_buf//dsize, max_buf_meas)
+                   # self.logger.warning(
+                   #     'Too many measurments in the input buffer: %d/%d. '
+                   #     'Clearing buffer...',
+                   #     data_in_buf//dsize, max_buf_meas)
                     self._serial_port.read(data_in_buf//dsize*dsize)
             yield _process_scan(raw)
 
-    def iter_scans(self, max_buf_meas=500, min_len=5):
+    def iter_scans(self, max_buf_meas=500, min_len=50):
         '''Iterate over scans. Note that consumer must be fast enough,
         otherwise data will be accumulated inside buffer and consumer will get
         data with increasing lag.
@@ -356,9 +355,8 @@ class RPLidar(object):
         scan = []
         iterator = self.iter_measurments(max_buf_meas)
         for new_scan, quality, angle, distance in iterator:
-            if new_scan:
-                if len(scan) > min_len:
-                    yield scan
+            if new_scan and len(scan) > min_len:
+                yield scan
                 scan = []
             if quality > 0 and distance > 0:
                 scan.append((quality, angle, distance))
