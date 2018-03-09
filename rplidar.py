@@ -27,7 +27,6 @@ import time
 import codecs
 import serial
 import struct
-
 SYNC_BYTE = b'\xA5'
 SYNC_BYTE2 = b'\x5A'
 
@@ -50,7 +49,7 @@ SCAN_TYPE = 129
 
 #Constants & Command to start A2 motor
 MAX_MOTOR_PWM = 1023
-DEFAULT_MOTOR_PWM = 600
+DEFAULT_MOTOR_PWM = 660
 SET_PWM_BYTE = b'\xF0'
 
 _HEALTH_STATUSES = {
@@ -325,14 +324,15 @@ class RPLidar(object):
             if max_buf_meas:
                 data_in_buf = self._serial_port.in_waiting
                 if data_in_buf > max_buf_meas*dsize:
-                   # self.logger.warning(
-                   #     'Too many measurments in the input buffer: %d/%d. '
-                   #     'Clearing buffer...',
-                   #     data_in_buf//dsize, max_buf_meas)
-                    self._serial_port.read(data_in_buf//dsize*dsize)
+                    #self.logger.warning(
+                    #    'Too many measurments in the input buffer: %d/%d. '
+                    #    'Clearing buffer...',
+                    #    data_in_buf//dsize, max_buf_meas)
+                    #self._serial_port.read(data_in_buf//dsize*dsize)
+                    True
             yield _process_scan(raw)
 
-    def iter_scans(self, max_buf_meas=500, min_len=50):
+    def iter_scans(self, max_buf_meas=500, min_len=5):
         '''Iterate over scans. Note that consumer must be fast enough,
         otherwise data will be accumulated inside buffer and consumer will get
         data with increasing lag.
@@ -352,12 +352,17 @@ class RPLidar(object):
             format: (quality, angle, distance). For values description please
             refer to `iter_measurments` method's documentation.
         '''
-        scan = []
+        scan = [list(), list(),list()]
         iterator = self.iter_measurments(max_buf_meas)
         for new_scan, quality, angle, distance in iterator:
-            if new_scan and len(scan) > min_len:
-                yield scan
-                scan = []
+            if new_scan:
+                if len(scan[0]) > min_len:
+                    yield scan
+                else:
+                    print("discard < 5 data points")
+                scan = [list(), list(), list()]
             if quality > 0 and distance > 0:
-                scan.append((quality, angle, distance))
+                scan[0].append(quality)
+                scan[1].append(angle)
+                scan[2].append(distance)
 

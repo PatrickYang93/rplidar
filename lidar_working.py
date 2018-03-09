@@ -10,14 +10,15 @@ PORT_NAME = 'COM3'
 DMAX = 5000
 IMIN = 0
 IMAX = 50
-max_quality = 31
+max_quality = 28
 error_rate = 3
 simple_point = 3
-mark_inter = 100
 damping = 200
 ann_list = []
+marker = [0,0]
 
 def update_line(num, iterator, line):
+    global marker
     scan = next(iterator)
     offsets = np.array([(np.radians(meas[1]), meas[2]) for meas in scan])
     #print(scan[0][1],scan[-1][1])
@@ -72,7 +73,7 @@ def update_line(num, iterator, line):
         y = i[2] * np.sin(i[1])
         if(len(mark_list) == 0):
             mark_list.append([x,y])
-        elif(abs(mark_list[-1][0] - x) <= mark_inter + i[2] / damping *5 and abs(mark_list[-1][1] - y <= mark_inter + i[2] / damping *5)):
+        elif(abs(mark_list[-1][0] - x) <= (50+i[2] / damping * 10) and abs(mark_list[-1][1] - y <= (50+i[2] / damping * 10))):
             mark_list.append([x,y])
         else:
            error += 1
@@ -81,10 +82,10 @@ def update_line(num, iterator, line):
             error = 0
 
     if(len(mark_list) >= simple_point):
-        x = mark_list[0][0] - mark_list[-1][0]
-        y = mark_list[0][1] - mark_list[-1][1]
-        distance = np.sqrt(x**2 + y**2)
-        print(distance)
+        #x = mark_list[0][0] - mark_list[-1][0]
+        #y = mark_list[0][1] - mark_list[-1][1]
+        #distance = np.sqrt(x**2 + y**2)
+        #print(distance)
         for i in mark_list:
             sum_x += i[0]
             sum_y += i[1]
@@ -94,10 +95,14 @@ def update_line(num, iterator, line):
         rho = np.sqrt(cood_x**2 + cood_y**2)
         phi = np.arctan2(cood_y, cood_x)
         #print('Angle: ', phi/np.pi*180)
+        marker = [phi,rho]
         ann = plt.annotate(('marker'), (phi,rho), color = "purple", fontsize = 9)
         ann_list.append(ann)
     else:
-        print('Marker did not detected!')
+        #print('Marker did not detected!')
+        ann = plt.annotate(('marker'), (marker), color = "purple", fontsize = 9)
+        ann_list.append(ann)
+    print(int(marker[1]))
     return line,
 
 def run():
